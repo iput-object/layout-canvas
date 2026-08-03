@@ -56,6 +56,7 @@ function DrawingBoundary({
   onResizePointerDown: (e: React.PointerEvent, edge: BoundaryEdge) => void;
 }) {
   const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
   const isMoveHandleInside = bounds.maxY > 95;
   const horizontalPattern = {
     backgroundImage:
@@ -91,14 +92,27 @@ function DrawingBoundary({
         };
     const trackClass = [
       'absolute border-[var(--boundary-line)] transition-opacity',
-      isActive ? 'opacity-100' : 'opacity-65 group-hover:opacity-100',
-      edge === 'top' && 'left-0 right-0 top-1/2 h-2 border-t',
-      edge === 'bottom' && 'left-0 right-0 bottom-1/2 h-2 border-b',
-      edge === 'left' && 'top-0 bottom-0 left-1/2 w-2 border-l',
-      edge === 'right' && 'top-0 bottom-0 right-1/2 w-2 border-r',
+      edge === 'top' && 'top-1/2 h-2 border-t',
+      edge === 'bottom' && 'bottom-1/2 h-2 border-b',
+      edge === 'left' && 'left-1/2 w-2 border-l',
+      edge === 'right' && 'right-1/2 w-2 border-r',
     ]
       .filter(Boolean)
       .join(' ');
+    const fullTrackStyle = isHorizontal
+      ? { ...horizontalPattern, left: 0, width: '100%' }
+      : { ...verticalPattern, top: 0, height: '100%' };
+    const activeTrackStyle = isHorizontal
+      ? {
+          ...horizontalPattern,
+          left: `${bounds.minX}%`,
+          width: `${width}%`,
+        }
+      : {
+          ...verticalPattern,
+          top: `${bounds.minY}%`,
+          height: `${height}%`,
+        };
 
     return (
       <button
@@ -117,8 +131,21 @@ function DrawingBoundary({
       >
         <span
           aria-hidden="true"
-          className={trackClass}
-          style={isHorizontal ? horizontalPattern : verticalPattern}
+          className={`${trackClass} ${
+            isActive
+              ? 'opacity-40'
+              : 'opacity-20 group-hover:opacity-35'
+          }`}
+          style={fullTrackStyle}
+        />
+        <span
+          aria-hidden="true"
+          className={`${trackClass} ${
+            isActive
+              ? 'opacity-100'
+              : 'opacity-65 group-hover:opacity-100'
+          }`}
+          style={activeTrackStyle}
         />
       </button>
     );
@@ -126,6 +153,17 @@ function DrawingBoundary({
 
   return (
     <div className="pointer-events-none absolute inset-0 z-30">
+      <div
+        aria-hidden="true"
+        className="absolute"
+        style={{
+          left: `${bounds.minX}%`,
+          top: `${bounds.minY}%`,
+          width: `${width}%`,
+          height: `${height}%`,
+          boxShadow: '0 0 0 100vmax var(--boundary-outside)',
+        }}
+      />
       {(['top', 'right', 'bottom', 'left'] as BoundaryEdge[]).map(renderRuler)}
       <button
         type="button"

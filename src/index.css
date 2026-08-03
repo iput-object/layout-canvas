@@ -33,6 +33,7 @@
   --board-ink-muted: #6e6e73;
   --boundary-line: rgba(29, 29, 31, 0.72);
   --boundary-ruler: rgba(29, 29, 31, 0.34);
+  --boundary-outside: rgba(29, 29, 31, 0.06);
   --board-shadow: 0 22px 48px rgba(0, 0, 0, 0.14);
   --board-select-bg: rgba(90, 200, 250, 0.14);
   --board-select-border: #5ac8fa;
@@ -72,6 +73,7 @@
   --board-ink-muted: #a1a1a6;
   --boundary-line: rgba(245, 245, 247, 0.72);
   --boundary-ruler: rgba(245, 245, 247, 0.34);
+  --boundary-outside: rgba(0, 0, 0, 0.22);
   --board-shadow: 0 24px 56px rgba(0, 0, 0, 0.65);
   --board-select-bg: rgba(100, 210, 255, 0.14);
   --board-select-border: #64d2ff;

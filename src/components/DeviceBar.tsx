@@ -1,5 +1,5 @@
 import { Monitor, Smartphone, Tablet } from 'lucide-react';
-import { LiquidPanel } from './LiquidPanel';
+import { Panel } from './Panel';
 import type { DeviceType } from '../types';
 
 interface DeviceBarProps {
@@ -16,7 +16,7 @@ const DEVICES: { id: DeviceType; title: string; Icon: typeof Monitor }[] = [
 export function DeviceBar({ device, onDeviceChange }: DeviceBarProps) {
   return (
     <div className="flex-1 flex justify-center items-start pointer-events-none">
-      <LiquidPanel className="rounded-full pointer-events-auto">
+      <Panel className="rounded-full pointer-events-auto">
         <div className="flex items-center gap-0.5 p-1">
           {DEVICES.map(({ id, title, Icon }) => (
             <button
@@ -33,7 +33,7 @@ export function DeviceBar({ device, onDeviceChange }: DeviceBarProps) {
             </button>
           ))}
         </div>
-      </LiquidPanel>
+      </Panel>
     </div>
   );
 }

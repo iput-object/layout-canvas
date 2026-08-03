@@ -10,20 +10,11 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Register the service worker after first paint so it doesn't race WebGL init.
 if (import.meta.env.PROD) {
-  window.addEventListener(
-    'load',
-    () => {
-      window.setTimeout(() => {
-        registerSW({
-          immediate: true,
-          onRegisterError(error) {
-            console.warn('PWA registration failed', error);
-          },
-        });
-      }, 1500);
+  registerSW({
+    immediate: true,
+    onRegisterError(error) {
+      console.warn('PWA registration failed', error);
     },
-    {once: true},
-  );
+  });
 }

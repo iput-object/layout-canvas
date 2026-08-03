@@ -1,7 +1,7 @@
 import { Check, Copy, Info } from 'lucide-react';
 import { TYPE_CONFIG } from '../constants';
 import type { Arrow, Box, ElementType, Point } from '../types';
-import { LiquidPanel } from './LiquidPanel';
+import { Panel } from './Panel';
 import { ElementsTree } from './ElementsTree';
 
 interface PropertiesPanelProps {
@@ -33,7 +33,7 @@ export function PropertiesPanel({
   onCopySpec,
 }: PropertiesPanelProps) {
   return (
-    <LiquidPanel className="w-[300px] shrink-0 rounded-2xl pointer-events-auto h-full max-h-full">
+    <Panel className="w-[300px] shrink-0 rounded-2xl pointer-events-auto h-full max-h-full">
       <div className="flex flex-col h-full overflow-hidden text-[var(--text)]">
         <div className="p-5 border-b border-[var(--panel-divider)]">
           <h2 className="text-[11px] font-semibold text-[var(--text-faint)] uppercase tracking-[0.06em] mb-4">
@@ -165,6 +165,6 @@ export function PropertiesPanel({
           </button>
         </div>
       </div>
-    </LiquidPanel>
+    </Panel>
   );
 }

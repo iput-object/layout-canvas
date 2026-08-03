@@ -5,7 +5,6 @@ import { PropertiesPanel } from './components/PropertiesPanel';
 import { SplashScreen } from './components/SplashScreen';
 import { Toolbar } from './components/Toolbar';
 import { generateId } from './constants';
-import { useLiquidGL } from './hooks/useLiquidGL';
 import { useTheme } from './hooks/useTheme';
 import type {
   Arrow,
@@ -43,8 +42,6 @@ export default function App() {
 
   const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
-
-  useLiquidGL(!showSplash, theme);
 
   const dismissSplash = useCallback(() => {
     sessionStorage.setItem(SPLASH_KEY, '1');
@@ -322,15 +319,13 @@ export default function App() {
   };
 
   const clearAll = () => {
-    if (confirm('Clear all elements?')) {
-      setBoxes([]);
-      setArrows([]);
-      setSelectedId(null);
-      setTool('select');
-      setDragState({ type: 'none' });
-      setArrowStart(null);
-      setDrawCurrent(null);
-    }
+    setBoxes([]);
+    setArrows([]);
+    setSelectedId(null);
+    setTool('select');
+    setDragState({ type: 'none' });
+    setArrowStart(null);
+    setDrawCurrent(null);
   };
 
   const selectedBox = boxes.find((b) => b.id === selectedId);
@@ -364,10 +359,7 @@ export default function App() {
         }}
       />
 
-      <div
-        data-liquid-ignore
-        className="absolute inset-0 pointer-events-none z-30 flex p-4 sm:p-6 lg:p-8 gap-4 sm:gap-6"
-      >
+      <div className="absolute inset-0 pointer-events-none z-30 flex p-4 sm:p-6 lg:p-8 gap-4 sm:gap-6">
         <Toolbar
           tool={tool}
           theme={theme}

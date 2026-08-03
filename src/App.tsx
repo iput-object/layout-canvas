@@ -1,11 +1,11 @@
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, SlidersHorizontal, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Artboard } from './components/Artboard';
 import { DeviceBar } from './components/DeviceBar';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { SplashScreen } from './components/SplashScreen';
 import { Toolbar } from './components/Toolbar';
-import { DRAW_BOUNDS, generateId } from './constants';
+import { generateId, getDefaultDrawBounds } from './constants';
 import { useTheme } from './hooks/useTheme';
 import type {
   Arrow,
@@ -20,6 +20,48 @@ import type {
 
 const SPLASH_KEY = 'layout-canvas-splash-seen';
 const MIN_DRAW_BOUNDS_SIZE = 10;
+const TOOL_SHORTCUTS: Partial<Record<string, Tool>> = {
+  v: 'select',
+  b: 'box',
+  a: 'arrow',
+};
+
+const getViewportWidth = () =>
+  typeof window === 'undefined' ? 1280 : window.innerWidth;
+
+const hasSeenSplash = () => {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    return sessionStorage.getItem(SPLASH_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+const writeClipboardText = async (text: string) => {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch {
+    // Fall back for browsers that expose Clipboard API without granting access.
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.readOnly = true;
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const didCopy = document.execCommand('copy');
+  textarea.remove();
+
+  if (!didCopy) throw new Error('Clipboard copy failed');
+};
 
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
@@ -108,17 +150,17 @@ const resizeDrawBounds = (
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
-  const [showSplash, setShowSplash] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return sessionStorage.getItem(SPLASH_KEY) !== '1';
-  });
+  const [showSplash, setShowSplash] = useState(() => !hasSeenSplash());
   const [device, setDevice] = useState<DeviceType>('desktop');
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const [tool, setTool] = useState<Tool>('select');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [drawBounds, setDrawBounds] = useState<DrawBounds>(DRAW_BOUNDS);
+  const [mobileInspectorVisible, setMobileInspectorVisible] = useState(false);
+  const [drawBounds, setDrawBounds] = useState<DrawBounds>(() =>
+    getDefaultDrawBounds(getViewportWidth()),
+  );
 
   const [dragState, setDragState] = useState<DragState>({ type: 'none' });
   const [drawCurrent, setDrawCurrent] = useState<{ x: number; y: number } | null>(
@@ -132,11 +174,24 @@ export default function App() {
   } | null>(null);
 
   const [copied, setCopied] = useState(false);
+  const copiedTimerRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const dismissSplash = useCallback(() => {
-    sessionStorage.setItem(SPLASH_KEY, '1');
+    try {
+      sessionStorage.setItem(SPLASH_KEY, '1');
+    } catch {
+      // Storage can be unavailable in restricted browser modes.
+    }
     setShowSplash(false);
+  }, []);
+
+  const changeTool = useCallback((nextTool: Tool) => {
+    setTool(nextTool);
+    setDragState({ type: 'none' });
+    setDrawCurrent(null);
+    setArrowStart(null);
+    setArrowCurrent(null);
   }, []);
 
   useEffect(() => {
@@ -145,9 +200,19 @@ export default function App() {
     if (boot) boot.remove();
   }, []);
 
+  useEffect(
+    () => () => {
+      if (copiedTimerRef.current !== null) {
+        window.clearTimeout(copiedTimerRef.current);
+      }
+    },
+    [],
+  );
+
   const getCanvasCoords = (e: React.PointerEvent | PointerEvent) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
     return {
@@ -328,11 +393,20 @@ export default function App() {
       setDragState({ type: 'none' });
     };
 
+    const handleCancel = () => {
+      if (dragState.type === 'draw_box') setDrawCurrent(null);
+      setDragState({ type: 'none' });
+    };
+
     window.addEventListener('pointermove', handleMove);
     window.addEventListener('pointerup', handleUp);
+    window.addEventListener('pointercancel', handleCancel);
+    window.addEventListener('blur', handleCancel);
     return () => {
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('pointercancel', handleCancel);
+      window.removeEventListener('blur', handleCancel);
     };
   }, [dragState, tool, arrowStart, drawBounds]);
 
@@ -340,12 +414,15 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
         e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
       )
         return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedId) {
+          e.preventDefault();
           setBoxes((prev) => prev.filter((b) => b.id !== selectedId));
           setArrows((prev) =>
             prev.filter(
@@ -356,19 +433,24 @@ export default function App() {
             ),
           );
           setSelectedId(null);
+          setDragState({ type: 'none' });
         }
       }
       if (e.key === 'Escape') {
-        setDragState({ type: 'none' });
-        setDrawCurrent(null);
-        setArrowStart(null);
-        setArrowCurrent(null);
-        setTool('select');
+        changeTool('select');
+      }
+
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        const nextTool = TOOL_SHORTCUTS[e.key.toLowerCase()];
+        if (nextTool) {
+          e.preventDefault();
+          changeTool(nextTool);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId]);
+  }, [changeTool, selectedId]);
 
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
@@ -444,6 +526,7 @@ export default function App() {
   };
 
   const handleResizePointerDown = (e: React.PointerEvent, box: Box) => {
+    if (e.button !== 0) return;
     e.stopPropagation();
     const coords = getCoords(e);
     setDragState({
@@ -546,7 +629,9 @@ export default function App() {
       if (b) return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
       return null;
     }
-    return { x: p.x!, y: p.y! };
+    return p.x === undefined || p.y === undefined
+      ? null
+      : { x: p.x, y: p.y };
   };
 
   const getPointLabel = (p: Point) => {
@@ -557,7 +642,7 @@ export default function App() {
     return 'free point';
   };
 
-  const copySpec = () => {
+  const copySpec = async () => {
     const sortedBoxes = [...boxes].sort((a, b) => a.y - b.y || a.x - b.x);
 
     const boundsWidth = drawBounds.maxX - drawBounds.minX;
@@ -606,9 +691,19 @@ export default function App() {
       });
     }
 
-    navigator.clipboard.writeText(spec);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await writeClipboardText(spec);
+      setCopied(true);
+      if (copiedTimerRef.current !== null) {
+        window.clearTimeout(copiedTimerRef.current);
+      }
+      copiedTimerRef.current = window.setTimeout(() => {
+        setCopied(false);
+        copiedTimerRef.current = null;
+      }, 2000);
+    } catch {
+      setCopied(false);
+    }
   };
 
   const clearAll = () => {
@@ -618,8 +713,9 @@ export default function App() {
     setTool('select');
     setDragState({ type: 'none' });
     setArrowStart(null);
+    setArrowCurrent(null);
     setDrawCurrent(null);
-    setDrawBounds(DRAW_BOUNDS);
+    setDrawBounds(getDefaultDrawBounds(getViewportWidth()));
   };
 
   const selectedBox = boxes.find((b) => b.id === selectedId);
@@ -627,7 +723,7 @@ export default function App() {
 
   return (
     <div
-      className="h-screen w-screen overflow-hidden select-none relative bg-[var(--app-bg)] text-[var(--text)]"
+      className="h-screen h-dvh w-screen overflow-hidden select-none relative bg-[var(--app-bg)] text-[var(--text)]"
       style={{ fontFamily: 'var(--font)' }}
     >
       {showSplash && <SplashScreen onDone={dismissSplash} />}
@@ -652,16 +748,16 @@ export default function App() {
         onBoundaryResizePointerDown={handleBoundaryResizePointerDown}
         onArrowPointerDown={handleArrowPointerDown}
         onArrowEndpointPointerDown={handleArrowEndpointPointerDown}
-        onSelectArrow={(id) => {
-          setTool('select');
-          setSelectedId(id);
-        }}
       />
 
       <button
         type="button"
-        title={controlsVisible ? "Hide options" : "Show options"}
-        onClick={() => setControlsVisible((visible) => !visible)}
+        aria-label={controlsVisible ? 'Hide options' : 'Show options'}
+        title={controlsVisible ? 'Hide options' : 'Show options'}
+        onClick={() => {
+          setControlsVisible((visible) => !visible);
+          setMobileInspectorVisible(false);
+        }}
         className="absolute left-4 bottom-4 sm:left-6 sm:bottom-6 lg:left-8 lg:bottom-8 z-40 pointer-events-auto p-2.5 rounded-full selected-glass"
       >
         {controlsVisible ? (
@@ -673,29 +769,62 @@ export default function App() {
 
       {controlsVisible && (
         <div className="absolute inset-0 pointer-events-none z-30 flex p-4 sm:p-6 lg:p-8 gap-4 sm:gap-6">
-        <Toolbar
-          tool={tool}
-          theme={theme}
-          onToolChange={setTool}
-          onClear={clearAll}
-          onToggleTheme={toggleTheme}
-        />
-        <DeviceBar device={device} onDeviceChange={setDevice} />
-        <PropertiesPanel
-          boxes={boxes}
-          selectedId={selectedId}
-          selectedBox={selectedBox}
-          selectedArrow={selectedArrow}
-          copied={copied}
-          getPointLabel={getPointLabel}
-          onSelect={(id) => {
-            setSelectedId(id);
-            setTool('select');
-          }}
-          onUpdateBox={updateBox}
-          onUpdateArrow={updateArrow}
-          onCopySpec={copySpec}
-        />
+          <Toolbar
+            tool={tool}
+            theme={theme}
+            onToolChange={changeTool}
+            onClear={clearAll}
+            onToggleTheme={toggleTheme}
+          />
+          <DeviceBar device={device} onDeviceChange={setDevice} />
+          {mobileInspectorVisible && (
+            <button
+              type="button"
+              aria-label="Close properties"
+              onClick={() => setMobileInspectorVisible(false)}
+              className="absolute inset-0 z-30 bg-black/20 backdrop-blur-[2px] pointer-events-auto lg:hidden"
+            />
+          )}
+          <div
+            className={`${
+              mobileInspectorVisible ? 'block' : 'hidden'
+            } absolute inset-x-4 top-20 bottom-20 z-40 pointer-events-auto sm:inset-x-6 lg:static lg:block lg:w-[300px] lg:h-full lg:shrink-0`}
+          >
+            <PropertiesPanel
+              boxes={boxes}
+              selectedId={selectedId}
+              selectedBox={selectedBox}
+              selectedArrow={selectedArrow}
+              copied={copied}
+              getPointLabel={getPointLabel}
+              onSelect={(id) => {
+                setSelectedId(id);
+                setTool('select');
+              }}
+              onUpdateBox={updateBox}
+              onUpdateArrow={updateArrow}
+              onCopySpec={copySpec}
+            />
+          </div>
+          <button
+            type="button"
+            aria-label={
+              mobileInspectorVisible ? 'Close properties' : 'Open properties'
+            }
+            title={
+              mobileInspectorVisible ? 'Close properties' : 'Open properties'
+            }
+            onClick={() =>
+              setMobileInspectorVisible((visible) => !visible)
+            }
+            className="selected-glass absolute right-4 bottom-4 z-50 grid h-10 w-10 place-items-center rounded-full pointer-events-auto sm:right-6 sm:bottom-6 lg:hidden"
+          >
+            {mobileInspectorVisible ? (
+              <X size={17} strokeWidth={1.75} />
+            ) : (
+              <SlidersHorizontal size={17} strokeWidth={1.75} />
+            )}
+          </button>
         </div>
       )}
     </div>

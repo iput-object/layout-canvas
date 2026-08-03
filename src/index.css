@@ -89,6 +89,16 @@ body,
   -moz-osx-font-smoothing: grayscale;
 }
 
+body {
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Selected control */
 .selected-glass {
   background: var(--selected-glass-bg);

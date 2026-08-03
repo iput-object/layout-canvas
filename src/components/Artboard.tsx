@@ -40,7 +40,6 @@ interface ArtboardProps {
     arrowId: string,
     endpoint: 'start' | 'end',
   ) => void;
-  onSelectArrow: (id: string) => void;
 }
 
 function DrawingBoundary({
@@ -57,7 +56,6 @@ function DrawingBoundary({
   onResizePointerDown: (e: React.PointerEvent, edge: BoundaryEdge) => void;
 }) {
   const width = bounds.maxX - bounds.minX;
-  const height = bounds.maxY - bounds.minY;
   const isMoveHandleInside = bounds.maxY > 95;
   const horizontalPattern = {
     backgroundImage:
@@ -78,17 +76,17 @@ function DrawingBoundary({
       dragState.type === 'resize_bounds' && dragState.edge === edge;
     const position = isHorizontal
       ? {
-          left: `${bounds.minX}%`,
+          left: 0,
           top: `${edge === 'top' ? bounds.minY : bounds.maxY}%`,
-          width: `${width}%`,
+          width: '100%',
           height: 28,
           transform: 'translateY(-50%)',
         }
       : {
           left: `${edge === 'left' ? bounds.minX : bounds.maxX}%`,
-          top: `${bounds.minY}%`,
+          top: 0,
           width: 28,
-          height: `${height}%`,
+          height: '100%',
           transform: 'translateX(-50%)',
         };
     const trackClass = [
@@ -175,7 +173,6 @@ export const Artboard = forwardRef<HTMLDivElement, ArtboardProps>(
       onBoundaryResizePointerDown,
       onArrowPointerDown,
       onArrowEndpointPointerDown,
-      onSelectArrow,
     },
     ref,
   ) {
@@ -239,7 +236,6 @@ export const Artboard = forwardRef<HTMLDivElement, ArtboardProps>(
             arrowStart={arrowStart}
             arrowCurrent={arrowCurrent}
             resolvePoint={resolvePoint}
-            onSelectArrow={onSelectArrow}
             onArrowPointerDown={onArrowPointerDown}
             onArrowEndpointPointerDown={onArrowEndpointPointerDown}
           />

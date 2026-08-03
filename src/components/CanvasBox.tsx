@@ -49,10 +49,14 @@ export function CanvasBox({
         {box.type === 'Note' ? box.note || 'Empty note...' : box.note || box.label}
       </div>
       {isSelected && tool === 'select' && (
-        <div
+        <button
+          type="button"
+          aria-label={`Resize ${box.label}`}
           onPointerDown={(e) => onResizePointerDown(e, box)}
-          className="absolute -bottom-1.5 -right-1.5 z-[5] w-3.5 h-3.5 cursor-nwse-resize rounded-full bg-[var(--accent)] border-2 border-white dark:border-[#1c1c1e]"
-        />
+          className="absolute -bottom-3 -right-3 z-[5] grid h-7 w-7 cursor-nwse-resize place-items-center border-0 bg-transparent p-0"
+        >
+          <span className="block h-3.5 w-3.5 rounded-full bg-[var(--accent)] border-2 border-white dark:border-[#1c1c1e]" />
+        </button>
       )}
     </div>
   );

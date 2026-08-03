@@ -7,7 +7,6 @@ interface ArrowsOverlayProps {
   arrowStart: Point | null;
   arrowCurrent: { x: number; y: number } | null;
   resolvePoint: (p: Point) => { x: number; y: number } | null;
-  onSelectArrow: (id: string) => void;
   onArrowPointerDown: (e: React.PointerEvent, arrow: Arrow) => void;
   onArrowEndpointPointerDown: (
     e: React.PointerEvent,
@@ -23,7 +22,6 @@ export function ArrowsOverlay({
   arrowStart,
   arrowCurrent,
   resolvePoint,
-  onSelectArrow,
   onArrowPointerDown,
   onArrowEndpointPointerDown,
 }: ArrowsOverlayProps) {
@@ -89,13 +87,30 @@ export function ArrowsOverlay({
                 <circle
                   cx={s.x + "%"}
                   cy={s.y + "%"}
+                  r="14"
+                  fill="transparent"
+                  className="cursor-grab active:cursor-grabbing"
+                  onPointerDown={(evt) =>
+                    onArrowEndpointPointerDown(evt, a.id, "start")
+                  }
+                />
+                <circle
+                  cx={s.x + "%"}
+                  cy={s.y + "%"}
                   r="6"
                   fill="var(--board-bg)"
                   stroke="var(--accent)"
                   strokeWidth="2"
+                  className="pointer-events-none"
+                />
+                <circle
+                  cx={e.x + "%"}
+                  cy={e.y + "%"}
+                  r="14"
+                  fill="transparent"
                   className="cursor-grab active:cursor-grabbing"
                   onPointerDown={(evt) =>
-                    onArrowEndpointPointerDown(evt, a.id, "start")
+                    onArrowEndpointPointerDown(evt, a.id, "end")
                   }
                 />
                 <circle
@@ -105,10 +120,7 @@ export function ArrowsOverlay({
                   fill="var(--accent)"
                   stroke="var(--board-bg)"
                   strokeWidth="2"
-                  className="cursor-grab active:cursor-grabbing"
-                  onPointerDown={(evt) =>
-                    onArrowEndpointPointerDown(evt, a.id, "end")
-                  }
+                  className="pointer-events-none"
                 />
               </>
             )}

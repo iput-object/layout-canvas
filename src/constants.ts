@@ -1,4 +1,4 @@
-import type { ElementType } from './types';
+import type { DrawBounds, ElementType } from './types';
 
 export const TYPE_CONFIG: Record<
   ElementType,
@@ -60,18 +60,49 @@ export const TYPE_CONFIG: Record<
 
 export const generateId = () => Math.random().toString(36).substring(2, 9);
 
-export const DRAW_BOUNDS = {
+const DESKTOP_DRAW_BOUNDS: DrawBounds = {
   minX: 8,
   minY: 11,
   maxX: 75,
   maxY: 92,
 };
 
+const TABLET_DRAW_BOUNDS: DrawBounds = {
+  minX: 13,
+  minY: 10,
+  maxX: 94,
+  maxY: 90,
+};
+
+const PHONE_DRAW_BOUNDS: DrawBounds = {
+  minX: 22,
+  minY: 12,
+  maxX: 94,
+  maxY: 87,
+};
+
+export function getDefaultDrawBounds(viewportWidth: number): DrawBounds {
+  const bounds =
+    viewportWidth < 640
+      ? PHONE_DRAW_BOUNDS
+      : viewportWidth < 1024
+        ? TABLET_DRAW_BOUNDS
+        : DESKTOP_DRAW_BOUNDS;
+
+  return { ...bounds };
+}
+
 export const DEVICE_SIZE: Record<
   'desktop' | 'tablet' | 'mobile',
   { width: string; height: string }
 > = {
   desktop: { width: '100%', height: '100%' },
-  tablet: { width: '768px', height: '1024px' },
-  mobile: { width: '375px', height: '812px' },
+  tablet: {
+    width: 'min(90vw, 67.5dvh)',
+    height: 'min(90dvh, 120vw)',
+  },
+  mobile: {
+    width: 'min(90vw, 41.56dvh)',
+    height: 'min(90dvh, 194.88vw)',
+  },
 };

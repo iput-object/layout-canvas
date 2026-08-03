@@ -14,7 +14,7 @@ interface PropertiesPanelProps {
   onSelect: (id: string) => void;
   onUpdateBox: (id: string, updates: Partial<Box>) => void;
   onUpdateArrow: (id: string, updates: Partial<Arrow>) => void;
-  onCopySpec: () => void;
+  onCopySpec: () => void | Promise<void>;
 }
 
 const fieldClass =
@@ -33,9 +33,9 @@ export function PropertiesPanel({
   onCopySpec,
 }: PropertiesPanelProps) {
   return (
-    <Panel className="w-[300px] shrink-0 rounded-2xl pointer-events-auto h-full max-h-full">
+    <Panel className="h-full w-full rounded-2xl pointer-events-auto">
       <div className="flex flex-col h-full overflow-hidden text-[var(--text)]">
-        <div className="p-5 border-b border-[var(--panel-divider)]">
+        <div className="max-h-[62%] shrink-0 overflow-y-auto p-5 border-b border-[var(--panel-divider)]">
           <h2 className="text-[11px] font-semibold text-[var(--text-faint)] uppercase tracking-[0.06em] mb-4">
             Properties
           </h2>

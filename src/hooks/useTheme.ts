@@ -6,8 +6,14 @@ const STORAGE_KEY = 'layout-canvas-theme';
 
 function getPreferredTheme(): Theme {
   if (typeof window === 'undefined') return 'dark';
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === 'light' || stored === 'dark') return stored;
+
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch {
+    // Fall through to the system preference when storage is unavailable.
+  }
+
   return window.matchMedia('(prefers-color-scheme: light)').matches
     ? 'light'
     : 'dark';
@@ -30,7 +36,11 @@ export function useTheme() {
 
   useEffect(() => {
     applyTheme(theme);
-    localStorage.setItem(STORAGE_KEY, theme);
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch {
+      // Theme still applies for the current session.
+    }
   }, [theme]);
 
   const setTheme = (next: Theme) => setThemeState(next);

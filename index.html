@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Layout Canvas</title>
+    <meta
+      name="description"
+      content="Draw interface layouts, annotate them, and export a clean layout spec."
+    />
+    <meta name="theme-color" content="#000000" />
+    <meta name="application-name" content="Layout Canvas" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Layout Canvas" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Layout Canvas" />
+    <meta property="og:title" content="Layout Canvas" />
+    <meta
+      property="og:description"
+      content="Draw interface layouts, annotate them, and export a clean layout spec."
+    />
+    <meta property="og:image" content="%BASE_URL%og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Layout Canvas" />
+    <meta
+      name="twitter:description"
+      content="Draw interface layouts, annotate them, and export a clean layout spec."
+    />
+    <meta name="twitter:image" content="%BASE_URL%og.png" />
+
+    <link rel="icon" type="image/png" sizes="192x192" href="%BASE_URL%icons/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="%BASE_URL%icons/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%icons/icon-180.png" />
+
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        color: #f5f5f7;
+        font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      html.light, html.light body { background: #f5f5f7; color: #1d1d1f; }
+      #boot-splash {
+        position: fixed; inset: 0; display: grid; place-items: center;
+        z-index: 9999; background: #000; pointer-events: none;
+      }
+      #boot-splash .mark {
+        width: 64px; height: 64px; border-radius: 16px; overflow: hidden;
+      }
+      #boot-splash img { width: 100%; height: 100%; display: block; }
+      #root:not(:empty) ~ #boot-splash { display: none; }
+    </style>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('layout-canvas-theme');
+          if (t !== 'light' && t !== 'dark') {
+            t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          document.documentElement.classList.add(t);
+          document.documentElement.style.colorScheme = t;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', t === 'dark' ? '#000000' : '#f5f5f7');
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="boot-splash" aria-hidden="true">
+      <div class="mark"><img src="%BASE_URL%icons/icon-192.png" alt="" width="64" height="64" /></div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --app-bg: #f5f5f7;
+  --app-glow: rgba(0, 0, 0, 0.04);
+  --panel-bg: rgba(255, 255, 255, 0.72);
+  --panel-border: rgba(0, 0, 0, 0.08);
+  --panel-divider: rgba(60, 60, 67, 0.12);
+  --text: #1d1d1f;
+  --text-muted: #6e6e73;
+  --text-faint: #86868b;
+  --control-bg: rgba(120, 120, 128, 0.08);
+  --control-border: rgba(60, 60, 67, 0.18);
+  --control-text: #1d1d1f;
+  --accent: #5ac8fa;
+  --accent-soft: rgba(90, 200, 250, 0.18);
+  --accent-text: #003049;
+  --active-bg: #5ac8fa;
+  --active-text: #003049;
+  --hover-bg: rgba(120, 120, 128, 0.12);
+  --selected-glass-bg: rgba(255, 255, 255, 0.82);
+  --selected-glass-border: rgba(255, 255, 255, 0.95);
+  --selected-glass-text: #1d1d1f;
+  --selected-glass-sheen:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 4px 12px rgba(0, 0, 0, 0.06);
+  --board-bg: #ffffff;
+  --board-dot: rgba(0, 0, 0, 0.1);
+  --board-ink: #1d1d1f;
+  --board-ink-muted: #6e6e73;
+  --board-shadow: 0 22px 48px rgba(0, 0, 0, 0.14);
+  --board-select-bg: rgba(90, 200, 250, 0.14);
+  --board-select-border: #5ac8fa;
+  --board-select-ring: 0 0 0 3px rgba(90, 200, 250, 0.28);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.dark {
+  --app-bg: #000000;
+  --app-glow: rgba(255, 255, 255, 0.06);
+  --panel-bg: rgba(44, 44, 46, 0.72);
+  --panel-border: rgba(255, 255, 255, 0.12);
+  --panel-divider: rgba(84, 84, 88, 0.65);
+  --text: #f5f5f7;
+  --text-muted: #a1a1a6;
+  --text-faint: #6e6e73;
+  --control-bg: rgba(120, 120, 128, 0.24);
+  --control-border: rgba(84, 84, 88, 0.65);
+  --control-text: #f5f5f7;
+  --accent: #64d2ff;
+  --accent-soft: rgba(100, 210, 255, 0.22);
+  --accent-text: #003a4a;
+  --active-bg: #64d2ff;
+  --active-text: #003a4a;
+  --hover-bg: rgba(120, 120, 128, 0.28);
+  --selected-glass-bg: rgba(255, 255, 255, 0.18);
+  --selected-glass-border: rgba(255, 255, 255, 0.28);
+  --selected-glass-text: #ffffff;
+  --selected-glass-sheen:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 8px 20px rgba(0, 0, 0, 0.35);
+  --board-bg: #1c1c1e;
+  --board-dot: rgba(255, 255, 255, 0.12);
+  --board-ink: #f5f5f7;
+  --board-ink-muted: #a1a1a6;
+  --board-shadow: 0 24px 56px rgba(0, 0, 0, 0.65);
+  --board-select-bg: rgba(100, 210, 255, 0.14);
+  --board-select-border: #64d2ff;
+  --board-select-ring: 0 0 0 3px rgba(100, 210, 255, 0.28);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: var(--app-bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Selected control */
+.selected-glass {
+  background: var(--selected-glass-bg);
+  color: var(--selected-glass-text);
+  border: 1px solid var(--selected-glass-border);
+  box-shadow: var(--selected-glass-sheen);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+/* Selected list row */
+.selected-accent {
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 1px solid var(--accent);
+  box-shadow: none;
+}
+
+/* Selected board item */
+.board-selected-glass {
+  background: var(--board-select-bg) !important;
+  border-color: var(--board-select-border) !important;
+  border-style: solid !important;
+  box-shadow: var(--board-select-ring), var(--selected-glass-sheen);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}

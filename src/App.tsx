@@ -5,12 +5,23 @@ import { DeviceBar } from './components/DeviceBar';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { SplashScreen } from './components/SplashScreen';
 import { Toolbar } from './components/Toolbar';
+import { loadDocument, saveDocument } from './canvas/document';
+import {
+  clamp,
+  clampPointToBounds,
+  getContentBounds,
+  resizeDrawBounds,
+  resolvePoint as resolveCanvasPoint,
+} from './canvas/geometry';
+import { generateLayoutSpec } from './canvas/spec';
 import { generateId, getDefaultDrawBounds } from './constants';
+import { useDocumentHistory } from './hooks/useDocumentHistory';
 import { useTheme } from './hooks/useTheme';
 import type {
   Arrow,
   BoundaryEdge,
   Box,
+  CanvasDocument,
   DeviceType,
   DragState,
   DrawBounds,
@@ -19,7 +30,6 @@ import type {
 } from './types';
 
 const SPLASH_KEY = 'layout-canvas-splash-seen';
-const MIN_DRAW_BOUNDS_SIZE = 10;
 const TOOL_SHORTCUTS: Partial<Record<string, Tool>> = {
   v: 'select',
   b: 'box',
@@ -63,103 +73,21 @@ const writeClipboardText = async (text: string) => {
   if (!didCopy) throw new Error('Clipboard copy failed');
 };
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.max(min, Math.min(max, value));
-
-const clampPointToBounds = (
-  { x, y }: { x: number; y: number },
-  bounds: DrawBounds,
-) => ({
-  x: clamp(x, bounds.minX, bounds.maxX),
-  y: clamp(y, bounds.minY, bounds.maxY),
-});
-
-const getPointCoordinates = (
-  point: Point,
-  boxesById: Map<string, Box>,
-): { x: number; y: number } | null => {
-  if (point.boxId) {
-    const box = boxesById.get(point.boxId);
-    return box ? { x: box.x + box.w / 2, y: box.y + box.h / 2 } : null;
-  }
-
-  return point.x === undefined || point.y === undefined
-    ? null
-    : { x: point.x, y: point.y };
-};
-
-const getContentBounds = (boxes: Box[], arrows: Arrow[]): DrawBounds | null => {
-  const boxesById = new Map(boxes.map((box) => [box.id, box]));
-  const boxCorners = boxes.flatMap((box) => [
-    { x: box.x, y: box.y },
-    { x: box.x + box.w, y: box.y + box.h },
-  ]);
-  const arrowPoints = arrows.flatMap((arrow) =>
-    [arrow.start, arrow.end]
-      .map((point) => getPointCoordinates(point, boxesById))
-      .filter((point): point is { x: number; y: number } => point !== null),
-  );
-  const points = [...boxCorners, ...arrowPoints];
-
-  if (points.length === 0) return null;
-
-  return {
-    minX: Math.min(...points.map((point) => point.x)),
-    minY: Math.min(...points.map((point) => point.y)),
-    maxX: Math.max(...points.map((point) => point.x)),
-    maxY: Math.max(...points.map((point) => point.y)),
-  };
-};
-
-const resizeDrawBounds = (
-  bounds: DrawBounds,
-  edge: BoundaryEdge,
-  pointer: { x: number; y: number },
-  contentBounds: DrawBounds | null,
-): DrawBounds => {
-  if (edge === 'left') {
-    const maxX = Math.min(
-      bounds.maxX - MIN_DRAW_BOUNDS_SIZE,
-      contentBounds?.minX ?? 100,
-    );
-    return { ...bounds, minX: clamp(pointer.x, 0, maxX) };
-  }
-
-  if (edge === 'right') {
-    const minX = Math.max(
-      bounds.minX + MIN_DRAW_BOUNDS_SIZE,
-      contentBounds?.maxX ?? 0,
-    );
-    return { ...bounds, maxX: clamp(pointer.x, minX, 100) };
-  }
-
-  if (edge === 'top') {
-    const maxY = Math.min(
-      bounds.maxY - MIN_DRAW_BOUNDS_SIZE,
-      contentBounds?.minY ?? 100,
-    );
-    return { ...bounds, minY: clamp(pointer.y, 0, maxY) };
-  }
-
-  const minY = Math.max(
-    bounds.minY + MIN_DRAW_BOUNDS_SIZE,
-    contentBounds?.maxY ?? 0,
-  );
-  return { ...bounds, maxY: clamp(pointer.y, minY, 100) };
-};
-
 export default function App() {
   const { theme, toggleTheme } = useTheme();
+  const [initialDocument] = useState(() =>
+    loadDocument(getDefaultDrawBounds(getViewportWidth())),
+  );
   const [showSplash, setShowSplash] = useState(() => !hasSeenSplash());
   const [device, setDevice] = useState<DeviceType>('desktop');
-  const [boxes, setBoxes] = useState<Box[]>([]);
-  const [arrows, setArrows] = useState<Arrow[]>([]);
+  const [boxes, setBoxes] = useState<Box[]>(initialDocument.boxes);
+  const [arrows, setArrows] = useState<Arrow[]>(initialDocument.arrows);
   const [tool, setTool] = useState<Tool>('select');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [mobileInspectorVisible, setMobileInspectorVisible] = useState(false);
-  const [drawBounds, setDrawBounds] = useState<DrawBounds>(() =>
-    getDefaultDrawBounds(getViewportWidth()),
+  const [drawBounds, setDrawBounds] = useState<DrawBounds>(
+    initialDocument.drawBounds,
   );
 
   const [dragState, setDragState] = useState<DragState>({ type: 'none' });
@@ -176,6 +104,29 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const copiedTimerRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const drawBoundsRef = useRef(drawBounds);
+  drawBoundsRef.current = drawBounds;
+
+  const applyDocument = useCallback((document: CanvasDocument) => {
+    setBoxes(document.boxes);
+    setArrows(document.arrows);
+    setDrawBounds(document.drawBounds);
+    setSelectedId(null);
+    setDragState({ type: 'none' });
+    setDrawCurrent(null);
+    setArrowStart(null);
+    setArrowCurrent(null);
+  }, []);
+
+  const {
+    beginTransaction,
+    canRedo,
+    canUndo,
+    commitTransaction,
+    recordChange,
+    redo,
+    undo,
+  } = useDocumentHistory({ boxes, arrows, drawBounds }, applyDocument);
 
   const dismissSplash = useCallback(() => {
     try {
@@ -209,6 +160,13 @@ export default function App() {
     [],
   );
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      saveDocument({ boxes, arrows, drawBounds });
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [arrows, boxes, drawBounds]);
+
   const getCanvasCoords = (e: React.PointerEvent | PointerEvent) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
@@ -222,12 +180,13 @@ export default function App() {
   };
 
   const getCoords = (e: React.PointerEvent | PointerEvent) =>
-    clampPointToBounds(getCanvasCoords(e), drawBounds);
+    clampPointToBounds(getCanvasCoords(e), drawBoundsRef.current);
 
   useEffect(() => {
     const handleMove = (e: PointerEvent) => {
       const canvasCoords = getCanvasCoords(e);
-      const coords = clampPointToBounds(canvasCoords, drawBounds);
+      const activeBounds = drawBoundsRef.current;
+      const coords = clampPointToBounds(canvasCoords, activeBounds);
 
       if (dragState.type === 'move_bounds') {
         const rawDx = canvasCoords.x - dragState.startX;
@@ -291,13 +250,13 @@ export default function App() {
                   ...b,
                   x: clamp(
                     dragState.initialBoxX + dx,
-                    drawBounds.minX,
-                    drawBounds.maxX - b.w,
+                    activeBounds.minX,
+                    activeBounds.maxX - b.w,
                   ),
                   y: clamp(
                     dragState.initialBoxY + dy,
-                    drawBounds.minY,
-                    drawBounds.maxY - b.h,
+                    activeBounds.minY,
+                    activeBounds.maxY - b.h,
                   ),
                 }
               : b,
@@ -314,12 +273,12 @@ export default function App() {
                   w: clamp(
                     dragState.initialBoxW + dx,
                     2,
-                    drawBounds.maxX - b.x,
+                    activeBounds.maxX - b.x,
                   ),
                   h: clamp(
                     dragState.initialBoxH + dy,
                     2,
-                    drawBounds.maxY - b.y,
+                    activeBounds.maxY - b.y,
                   ),
                 }
               : b,
@@ -332,8 +291,16 @@ export default function App() {
         const maxX = Math.max(dragState.initialStart.x, dragState.initialEnd.x);
         const minY = Math.min(dragState.initialStart.y, dragState.initialEnd.y);
         const maxY = Math.max(dragState.initialStart.y, dragState.initialEnd.y);
-        const dx = clamp(rawDx, drawBounds.minX - minX, drawBounds.maxX - maxX);
-        const dy = clamp(rawDy, drawBounds.minY - minY, drawBounds.maxY - maxY);
+        const dx = clamp(
+          rawDx,
+          activeBounds.minX - minX,
+          activeBounds.maxX - maxX,
+        );
+        const dy = clamp(
+          rawDy,
+          activeBounds.minY - minY,
+          activeBounds.maxY - maxY,
+        );
 
         setArrows((prev) =>
           prev.map((a) =>
@@ -371,6 +338,7 @@ export default function App() {
         const w = Math.abs(coords.x - dragState.start.x);
         const h = Math.abs(coords.y - dragState.start.y);
         if (w > 1 && h > 1) {
+          recordChange();
           const id = generateId();
           setBoxes((prev) => [
             ...prev,
@@ -389,12 +357,15 @@ export default function App() {
           setTool('select');
         }
         setDrawCurrent(null);
+      } else {
+        commitTransaction();
       }
       setDragState({ type: 'none' });
     };
 
     const handleCancel = () => {
       if (dragState.type === 'draw_box') setDrawCurrent(null);
+      else commitTransaction();
       setDragState({ type: 'none' });
     };
 
@@ -408,7 +379,13 @@ export default function App() {
       window.removeEventListener('pointercancel', handleCancel);
       window.removeEventListener('blur', handleCancel);
     };
-  }, [dragState, tool, arrowStart, drawBounds]);
+  }, [
+    arrowStart,
+    commitTransaction,
+    dragState,
+    recordChange,
+    tool,
+  ]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -420,9 +397,23 @@ export default function App() {
       )
         return;
 
+      const hasCommandModifier = e.ctrlKey || e.metaKey;
+      if (hasCommandModifier && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if (hasCommandModifier && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+        return;
+      }
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedId) {
           e.preventDefault();
+          recordChange();
           setBoxes((prev) => prev.filter((b) => b.id !== selectedId));
           setArrows((prev) =>
             prev.filter(
@@ -450,7 +441,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [changeTool, selectedId]);
+  }, [changeTool, recordChange, redo, selectedId, undo]);
 
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
@@ -466,6 +457,7 @@ export default function App() {
         setArrowStart({ x: coords.x, y: coords.y });
         setArrowCurrent({ x: coords.x, y: coords.y });
       } else {
+        recordChange();
         const newArrow: Arrow = {
           id: generateId(),
           start: arrowStart,
@@ -487,6 +479,7 @@ export default function App() {
 
     if (tool === 'select') {
       e.stopPropagation();
+      beginTransaction();
       const activeBox = e.altKey
         ? { ...box, id: generateId(), label: box.label + ' copy' }
         : box;
@@ -510,6 +503,7 @@ export default function App() {
         setArrowStart({ boxId: box.id });
         setArrowCurrent(coords);
       } else {
+        recordChange();
         const newArrow: Arrow = {
           id: generateId(),
           start: arrowStart,
@@ -528,6 +522,7 @@ export default function App() {
   const handleResizePointerDown = (e: React.PointerEvent, box: Box) => {
     if (e.button !== 0) return;
     e.stopPropagation();
+    beginTransaction();
     const coords = getCoords(e);
     setDragState({
       type: 'resize_box',
@@ -542,6 +537,7 @@ export default function App() {
   const handleBoundaryMovePointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0 || tool !== 'select') return;
     e.stopPropagation();
+    beginTransaction();
     const coords = getCanvasCoords(e);
     setSelectedId(null);
     setDragState({
@@ -559,6 +555,7 @@ export default function App() {
   ) => {
     if (e.button !== 0 || tool !== 'select') return;
     e.stopPropagation();
+    beginTransaction();
     setSelectedId(null);
     setDragState({
       type: 'resize_bounds',
@@ -577,16 +574,19 @@ export default function App() {
     if (!start || !end) return;
 
     const coords = getCoords(e);
+    if (!e.altKey && (arrow.start.boxId || arrow.end.boxId)) {
+      setSelectedId(arrow.id);
+      setTool('select');
+      return;
+    }
+
+    beginTransaction();
     const activeArrow = e.altKey
       ? { ...arrow, id: generateId(), start, end }
       : { ...arrow, start, end };
 
     if (e.altKey) {
       setArrows((prev) => [...prev, activeArrow]);
-    } else if (arrow.start.boxId || arrow.end.boxId) {
-      setArrows((prev) =>
-        prev.map((a) => (a.id === arrow.id ? activeArrow : a)),
-      );
     }
 
     setSelectedId(activeArrow.id);
@@ -608,31 +608,25 @@ export default function App() {
   ) => {
     if (e.button !== 0) return;
     e.stopPropagation();
+    beginTransaction();
     setSelectedId(arrowId);
     setTool('select');
     setDragState({ type: 'move_arrow_point', arrowId, endpoint });
   };
 
   const updateBox = (id: string, updates: Partial<Box>) => {
+    recordChange();
     setBoxes((prev) => prev.map((b) => (b.id === id ? { ...b, ...updates } : b)));
   };
 
   const updateArrow = (id: string, updates: Partial<Arrow>) => {
+    recordChange();
     setArrows((prev) =>
       prev.map((a) => (a.id === id ? { ...a, ...updates } : a)),
     );
   };
 
-  const resolvePoint = (p: Point): { x: number; y: number } | null => {
-    if (p.boxId) {
-      const b = boxes.find((bx) => bx.id === p.boxId);
-      if (b) return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
-      return null;
-    }
-    return p.x === undefined || p.y === undefined
-      ? null
-      : { x: p.x, y: p.y };
-  };
+  const resolvePoint = (point: Point) => resolveCanvasPoint(point, boxes);
 
   const getPointLabel = (p: Point) => {
     if (p.boxId) {
@@ -643,53 +637,7 @@ export default function App() {
   };
 
   const copySpec = async () => {
-    const sortedBoxes = [...boxes].sort((a, b) => a.y - b.y || a.x - b.x);
-
-    const boundsWidth = drawBounds.maxX - drawBounds.minX;
-    const boundsHeight = drawBounds.maxY - drawBounds.minY;
-
-    let spec =
-      "LAYOUT SPEC (coordinates are % of drawable boundary)\n\n";
-    spec +=
-      "Drawable boundary: x=" +
-      Math.round(drawBounds.minX) +
-      "%-" +
-      Math.round(drawBounds.maxX) +
-      "%, y=" +
-      Math.round(drawBounds.minY) +
-      "%-" +
-      Math.round(drawBounds.maxY) +
-      "%\n\n";
-
-    sortedBoxes.forEach((b, i) => {
-      spec += `${i + 1}. [${b.type}] "${b.label}"\n`;
-      const relativeX = ((b.x - drawBounds.minX) / boundsWidth) * 100;
-      const relativeY = ((b.y - drawBounds.minY) / boundsHeight) * 100;
-      const relativeW = (b.w / boundsWidth) * 100;
-      const relativeH = (b.h / boundsHeight) * 100;
-
-      spec +=
-        "   position: x=" +
-        Math.round(relativeX) +
-        "%, y=" +
-        Math.round(relativeY) +
-        "%, size=" +
-        Math.round(relativeW) +
-        "%×" +
-        Math.round(relativeH) +
-        "%\n";
-      if (b.note) spec += `   note: ${b.note}\n`;
-      spec += '\n';
-    });
-
-    if (arrows.length > 0) {
-      spec += 'RELATIONSHIPS / POINTERS:\n';
-      arrows.forEach((a) => {
-        spec += `- ${getPointLabel(a.start)} → ${getPointLabel(a.end)}`;
-        if (a.note) spec += `: ${a.note}`;
-        spec += '\n';
-      });
-    }
+    const spec = generateLayoutSpec({ boxes, arrows, drawBounds });
 
     try {
       await writeClipboardText(spec);
@@ -707,6 +655,15 @@ export default function App() {
   };
 
   const clearAll = () => {
+    const defaultBounds = getDefaultDrawBounds(getViewportWidth());
+    const boundaryIsDefault =
+      drawBounds.minX === defaultBounds.minX &&
+      drawBounds.minY === defaultBounds.minY &&
+      drawBounds.maxX === defaultBounds.maxX &&
+      drawBounds.maxY === defaultBounds.maxY;
+    if (boxes.length === 0 && arrows.length === 0 && boundaryIsDefault) return;
+
+    recordChange();
     setBoxes([]);
     setArrows([]);
     setSelectedId(null);
@@ -715,7 +672,7 @@ export default function App() {
     setArrowStart(null);
     setArrowCurrent(null);
     setDrawCurrent(null);
-    setDrawBounds(getDefaultDrawBounds(getViewportWidth()));
+    setDrawBounds(defaultBounds);
   };
 
   const selectedBox = boxes.find((b) => b.id === selectedId);
@@ -772,9 +729,13 @@ export default function App() {
           <Toolbar
             tool={tool}
             theme={theme}
+            canRedo={canRedo}
+            canUndo={canUndo}
             onToolChange={changeTool}
             onClear={clearAll}
+            onRedo={redo}
             onToggleTheme={toggleTheme}
+            onUndo={undo}
           />
           <DeviceBar device={device} onDeviceChange={setDevice} />
           {mobileInspectorVisible && (
@@ -792,6 +753,8 @@ export default function App() {
           >
             <PropertiesPanel
               boxes={boxes}
+              arrows={arrows}
+              drawBounds={drawBounds}
               selectedId={selectedId}
               selectedBox={selectedBox}
               selectedArrow={selectedArrow}

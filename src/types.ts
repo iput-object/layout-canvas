@@ -41,6 +41,12 @@ export interface DrawBounds {
   maxY: number;
 }
 
+export interface CanvasDocument {
+  boxes: Box[];
+  arrows: Arrow[];
+  drawBounds: DrawBounds;
+}
+
 export type BoundaryEdge = 'top' | 'right' | 'bottom' | 'left';
 
 export type DragState =

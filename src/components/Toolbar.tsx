@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Moon, MousePointer2, MoveUpRight, Square, Sun, Trash2 } from 'lucide-react';
+import {
+  Moon,
+  MousePointer2,
+  MoveUpRight,
+  Redo2,
+  Square,
+  Sun,
+  Trash2,
+  Undo2,
+} from 'lucide-react';
 import { Panel } from './Panel';
 import type { Theme } from '../hooks/useTheme';
 import type { Tool } from '../types';
@@ -9,16 +18,22 @@ interface ToolbarProps {
   theme: Theme;
   onToolChange: (tool: Tool) => void;
   onClear: () => void;
+  canRedo: boolean;
+  canUndo: boolean;
+  onRedo: () => void;
   onToggleTheme: () => void;
+  onUndo: () => void;
 }
 
 function ToolButton({
   active,
+  disabled,
   title,
   onClick,
   children,
 }: {
   active?: boolean;
+  disabled?: boolean;
   title: string;
   onClick: () => void;
   children: ReactNode;
@@ -26,8 +41,10 @@ function ToolButton({
   return (
     <button
       title={title}
+      type="button"
+      disabled={disabled}
       onClick={onClick}
-      className={`p-2.5 rounded-[10px] transition-all duration-150 ${
+      className={`p-2.5 rounded-[10px] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-30 ${
         active
           ? 'selected-glass'
           : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--hover-bg)] border border-transparent'
@@ -41,9 +58,13 @@ function ToolButton({
 export function Toolbar({
   tool,
   theme,
+  canRedo,
+  canUndo,
   onToolChange,
   onClear,
+  onRedo,
   onToggleTheme,
+  onUndo,
 }: ToolbarProps) {
   const [confirmClear, setConfirmClear] = useState(false);
   const confirmRef = useRef<HTMLDivElement>(null);
@@ -100,6 +121,13 @@ export function Toolbar({
             }}
           >
             <MoveUpRight size={17} strokeWidth={1.75} />
+          </ToolButton>
+          <div className="w-5 h-px bg-[var(--panel-divider)] my-1" />
+          <ToolButton title="Undo" disabled={!canUndo} onClick={onUndo}>
+            <Undo2 size={17} strokeWidth={1.75} />
+          </ToolButton>
+          <ToolButton title="Redo" disabled={!canRedo} onClick={onRedo}>
+            <Redo2 size={17} strokeWidth={1.75} />
           </ToolButton>
           <div className="w-5 h-px bg-[var(--panel-divider)] my-1" />
           <ToolButton

@@ -1,11 +1,14 @@
 import { Check, Copy, Info } from 'lucide-react';
-import { TYPE_CONFIG } from '../constants';
-import type { Arrow, Box, ElementType, Point } from '../types';
+import { toBoundaryRect } from '../canvas/geometry';
+import type { Arrow, Box, DrawBounds, Point } from '../types';
+import { ElementTypeSelect } from './ElementTypeSelect';
 import { Panel } from './Panel';
 import { ElementsTree } from './ElementsTree';
 
 interface PropertiesPanelProps {
   boxes: Box[];
+  arrows: Arrow[];
+  drawBounds: DrawBounds;
   selectedId: string | null;
   selectedBox?: Box;
   selectedArrow?: Arrow;
@@ -22,6 +25,8 @@ const fieldClass =
 
 export function PropertiesPanel({
   boxes,
+  arrows,
+  drawBounds,
   selectedId,
   selectedBox,
   selectedArrow,
@@ -32,6 +37,10 @@ export function PropertiesPanel({
   onUpdateArrow,
   onCopySpec,
 }: PropertiesPanelProps) {
+  const relativeBox = selectedBox
+    ? toBoundaryRect(selectedBox, drawBounds)
+    : null;
+
   return (
     <Panel className="h-full w-full rounded-2xl pointer-events-auto">
       <div className="flex flex-col h-full overflow-hidden text-[var(--text)]">
@@ -46,26 +55,10 @@ export function PropertiesPanel({
                 <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5">
                   Element Type
                 </label>
-                <div className="relative">
-                  <select
-                    value={selectedBox.type}
-                    onChange={(e) =>
-                      onUpdateBox(selectedBox.id, {
-                        type: e.target.value as ElementType,
-                      })
-                    }
-                    className={`${fieldClass} appearance-none`}
-                  >
-                    {Object.keys(TYPE_CONFIG).map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-faint)]">
-                    ▼
-                  </div>
-                </div>
+                <ElementTypeSelect
+                  value={selectedBox.type}
+                  onChange={(type) => onUpdateBox(selectedBox.id, { type })}
+                />
               </div>
 
               <div>
@@ -99,10 +92,10 @@ export function PropertiesPanel({
 
               <div className="pt-2">
                 <div className="text-[10px] text-[var(--text-muted)] font-mono bg-[var(--control-bg)] p-2 rounded-xl border border-[var(--panel-divider)]">
-                  Pos: x={Math.round(selectedBox.x)}% y=
-                  {Math.round(selectedBox.y)}% <br />
-                  Size: {Math.round(selectedBox.w)}% ×{' '}
-                  {Math.round(selectedBox.h)}%
+                  Pos: x={Math.round(relativeBox!.x)}% y=
+                  {Math.round(relativeBox!.y)}% <br />
+                  Size: {Math.round(relativeBox!.w)}% ×{' '}
+                  {Math.round(relativeBox!.h)}%
                 </div>
               </div>
             </div>
@@ -144,16 +137,18 @@ export function PropertiesPanel({
 
         <ElementsTree
           boxes={boxes}
+          arrows={arrows}
           selectedId={selectedId}
+          getPointLabel={getPointLabel}
           onSelect={onSelect}
         />
 
         <div className="p-5">
           <button
             onClick={onCopySpec}
-            disabled={boxes.length === 0}
+            disabled={boxes.length === 0 && arrows.length === 0}
             className={`w-full py-2.5 rounded-[12px] flex items-center justify-center gap-2 text-[13px] font-semibold transition-colors ${
-              boxes.length === 0
+              boxes.length === 0 && arrows.length === 0
                 ? 'bg-[var(--control-bg)] text-[var(--text-faint)] cursor-not-allowed'
                 : copied
                   ? 'selected-glass'

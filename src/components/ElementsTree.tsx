@@ -1,12 +1,20 @@
-import type { Box } from '../types';
+import type { Arrow, Box, Point } from '../types';
 
 interface ElementsTreeProps {
   boxes: Box[];
+  arrows: Arrow[];
   selectedId: string | null;
+  getPointLabel: (point: Point) => string;
   onSelect: (id: string) => void;
 }
 
-export function ElementsTree({ boxes, selectedId, onSelect }: ElementsTreeProps) {
+export function ElementsTree({
+  boxes,
+  arrows,
+  selectedId,
+  getPointLabel,
+  onSelect,
+}: ElementsTreeProps) {
   const sorted = [...boxes].sort((a, b) => a.y - b.y || a.x - b.x);
 
   return (
@@ -43,7 +51,37 @@ export function ElementsTree({ boxes, selectedId, onSelect }: ElementsTreeProps)
             </button>
           );
         })}
-        {boxes.length === 0 && (
+        {arrows.map((arrow) => {
+          const selected = selectedId === arrow.id;
+          return (
+            <button
+              key={arrow.id}
+              onClick={() => onSelect(arrow.id)}
+              className={`w-full text-left px-3 py-2 rounded-[10px] text-[13px] flex items-center gap-2.5 transition-colors ${
+                selected
+                  ? 'selected-accent'
+                  : 'text-[var(--text)] hover:bg-[var(--hover-bg)] border border-transparent'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 shrink-0 rounded-full ${
+                  selected ? 'bg-white/80' : 'bg-[var(--text-faint)]'
+                }`}
+              />
+              <span
+                className={`font-mono text-[10px] w-16 shrink-0 ${
+                  selected ? 'opacity-80' : 'text-[var(--text-muted)]'
+                }`}
+              >
+                [Arrow]
+              </span>
+              <span className="truncate font-medium">
+                {getPointLabel(arrow.start)} → {getPointLabel(arrow.end)}
+              </span>
+            </button>
+          );
+        })}
+        {boxes.length === 0 && arrows.length === 0 && (
           <div className="text-[13px] text-[var(--text-faint)] text-center py-6">
             Canvas is empty
           </div>

@@ -60,6 +60,13 @@ export const TYPE_CONFIG: Record<
 
 export const generateId = () => Math.random().toString(36).substring(2, 9);
 
+export const DRAW_BOUNDS = {
+  minX: 8,
+  minY: 11,
+  maxX: 75,
+  maxY: 92,
+};
+
 export const DEVICE_SIZE: Record<
   'desktop' | 'tablet' | 'mobile',
   { width: string; height: string }
